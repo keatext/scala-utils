@@ -1,0 +1,8 @@
+© 2016 KEATEXT ALL RIGHTS RESERVED
+
+Clarification:
+---
+We would like to release this code as open source, but we haven't yet chosen a
+license for it, hence the above restrictive copyright notice. If you'd like to
+use our code, please contact us and we can discuss which license would suit us
+both.
