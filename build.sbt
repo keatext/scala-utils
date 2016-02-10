@@ -35,3 +35,20 @@ libraryDependencies ++= {
 
 // uncomment to display inferred types and implicits upon recompilation, useful for debugging
 //scalacOptions in Compile ++= Seq("-Xprint-types", "-Xprint:typer")
+
+
+import ReleaseTransformations._
+
+// Change the version bump for the next version
+// Available are Bugfix, Minor, Major.
+releaseVersionBump := sbtrelease.Version.Bump.Bugfix
+
+releaseProcess := Seq[ReleaseStep](
+  inquireVersions,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  setNextVersion,
+  commitNextVersion,
+  pushChanges
+)
