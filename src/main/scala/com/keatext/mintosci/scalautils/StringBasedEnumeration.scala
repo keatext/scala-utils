@@ -6,7 +6,7 @@ import spray.json._
 trait StringBasedEnumeration extends Enumeration {
   def valueOf(name: String): Option[Value] = values.find(_.toString == name)
 
-  val jsonFormat = new RootJsonFormat[Value] {
+  implicit val jsonFormat = new RootJsonFormat[Value] {
     def write(value: Value) = JsString(value.toString)
 
     def read(value: JsValue): Value = value match {
