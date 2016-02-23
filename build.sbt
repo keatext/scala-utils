@@ -43,11 +43,22 @@ import ReleaseTransformations._
 // Available are Bugfix, Minor, Major.
 releaseVersionBump := sbtrelease.Version.Bump.Bugfix
 
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+
+publishTo in Global := {
+  val nexus = "http://data/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "nexus/content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "nexus/content/repositories/releases")
+}
+
 releaseProcess := Seq[ReleaseStep](
   inquireVersions,
   setReleaseVersion,
   commitReleaseVersion,
   tagRelease,
+  publishArtifacts,
   setNextVersion,
   commitNextVersion,
   pushChanges
