@@ -1,4 +1,4 @@
-name := "mintosci-scala-utils"
+name := "scala-utils"
 
 organization := "com.keatext"
 
