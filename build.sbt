@@ -12,7 +12,7 @@ scalacOptions := Seq(
 
 libraryDependencies ++= {
   val version = Map(
-    "akka"         -> "2.3.9",
+    "akka"         -> "2.3.12",
     "akka-stream"  -> "2.0-M2",
     "postgresql"   -> "9.4-1201-jdbc41",
     "slf4j"        -> "1.6.4",
