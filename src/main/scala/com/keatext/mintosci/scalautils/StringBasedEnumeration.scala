@@ -1,5 +1,6 @@
 package com.keatext.mintosci.scalautils
 
+import slick.driver.PostgresDriver.api._
 import spray.json._
 
 
@@ -17,4 +18,7 @@ trait StringBasedEnumeration extends Enumeration {
       case x => deserializationError(s"Expected JsString, but got ${x}")
     }
   }
+
+  implicit val columnType: BaseColumnType[Value] =
+    MappedColumnType.base[Value, String](_.value.toString, valueOf(_).get)
 }
