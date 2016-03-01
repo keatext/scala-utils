@@ -30,7 +30,7 @@ object DBValidator {
     }
   }
 
-  def validate(dBSignature: DBSignature, expectedDBSignature: DBSignature): DBValidity =
+  private def validate(dBSignature: DBSignature, expectedDBSignature: DBSignature): DBValidity =
     if (dBSignature.tables.isEmpty)
       EmptyDB()
     else if (dBSignature == expectedDBSignature)
@@ -39,7 +39,7 @@ object DBValidator {
       DBRequiresMigration()
 
 
-  def sqlType(column: FieldSymbol): String = {
+  private def sqlType(column: FieldSymbol): String = {
     val columnBuilder = new PostgresDriver.ColumnDDLBuilder(column)
 
     val sb = StringBuilder.newBuilder
@@ -51,7 +51,7 @@ object DBValidator {
   // have spurious DBRequiresMigration results.
   //
   // See http://www.postgresql.org/docs/9.4/static/datatype.html for a full list of all postgres types.
-  def normalizeSqlType(sqlType: String): String =
+  private def normalizeSqlType(sqlType: String): String =
     sqlType.toUpperCase match {
       case "_INT2" => "INT2 ARRAY"
       case "_INT4" => "INT4 ARRAY"
@@ -67,7 +67,7 @@ object DBValidator {
 
   // Obtaining the signatures for the existing tables, aka MTables.
 
-  def signatureForColumn(mColumn: MColumn): ColumnSignature = {
+  private def signatureForColumn(mColumn: MColumn): ColumnSignature = {
     // I don't understand under which circumstance nullable and isAutoInc could be None.
     // In practice, they never are.
     val nullable = mColumn.nullable.get
@@ -77,7 +77,7 @@ object DBValidator {
     ColumnSignature(nullable, typeName, isAutoInc)
   }
 
-  def querySignatureForTable(
+  private def querySignatureForTable(
     mTable: MTable
   )(
     implicit ec: ExecutionContext
@@ -93,7 +93,7 @@ object DBValidator {
       TableSignature(columnSignatures)
     }
 
-  def queryRequiredTables(
+  private def queryRequiredTables(
     requiredTableNames: Set[String]
   )(
     implicit ec: ExecutionContext
@@ -106,7 +106,7 @@ object DBValidator {
       requiredTableNames.contains(table.name.name)
     }
 
-  def querySignatureForDB(
+  private def querySignatureForDB(
     requiredTableNames: Set[String]
   )(
     implicit ec: ExecutionContext
@@ -134,14 +134,14 @@ object DBValidator {
   // and perform a lot of type coercions.
 
   // for debugging
-  def dumpAST(node: Node, indent: String = ""): Unit = {
+  private def dumpAST(node: Node, indent: String = ""): Unit = {
     println(indent + node.toString)
     node.nodeChildren.foreach {
       dumpAST(_, indent + "  ")
     }
   }
 
-  def signatureForFieldSymbol(column: FieldSymbol): ColumnSignature = {
+  private def signatureForFieldSymbol(column: FieldSymbol): ColumnSignature = {
     val nullable = column.tpe.isInstanceOf[OptionTypedType[_]]
     val typeName = normalizeSqlType(sqlType(column))
     val isAutoInc = column.options.contains(AutoInc)
@@ -149,7 +149,7 @@ object DBValidator {
     ColumnSignature(nullable, typeName, isAutoInc)
   }
 
-  def signatureForColumn(node: Node): (String, ColumnSignature) =
+  private def signatureForColumn(node: Node): (String, ColumnSignature) =
     node match {
       case (
         Select(_, fieldSymbol: FieldSymbol)
@@ -162,7 +162,7 @@ object DBValidator {
       case _ => sys.error(s"$node is not a column node")
     }
 
-  def signatureForColumns(columns: Seq[Node]): TableSignature = {
+  private def signatureForColumns(columns: Seq[Node]): TableSignature = {
     val columnSignatures: Map[String,ColumnSignature] =
       columns.map(signatureForColumn).toMap
 
