@@ -155,10 +155,15 @@ object DBValidator {
         Select(_, fieldSymbol: FieldSymbol)
       ) =>
         Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
+
       case OptionApply(
         Select(_, fieldSymbol: FieldSymbol)
       ) =>
         Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
+
+      case ProductNode(elements) =>
+        elements.flatMap(signatureForElement)
+
       case _ => sys.error(s"$node is not a column node")
     }
 
