@@ -169,11 +169,22 @@ object DBValidator {
     TableSignature(columnSignatures)
   }
 
+  private def signatureForTableShape(node: Node): TableSignature =
+    node match {
+      // def * : ProvenShape[(Int,Int)] = (columnX, columnY)
+      case ProductNode(columns) => signatureForColumns(columns)
+
+      // def * : ProvenShape[Point] = (columnX, columnY) <> (Point.tupled, Point.unapply)
+      case TypeMapping(shape, _, _) => signatureForTableShape(shape)
+
+      case _ => sys.error(s"$node is not a table shape node")
+    }
+
   // The node can be obtained via an expression of the form `TableQuery[Users].toNode`
   def signatureForTable(node: Node): TableSignature =
     node match {
-      case TableExpansion(_, _, TypeMapping(ProductNode(columns), _, _)) =>
-        signatureForColumns(columns)
+      case TableExpansion(_, _, shape) =>
+        signatureForTableShape(shape)
       case _ => sys.error(s"$node is not a table node")
     }
 }
