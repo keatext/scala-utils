@@ -149,22 +149,22 @@ object DBValidator {
     ColumnSignature(nullable, typeName, isAutoInc)
   }
 
-  private def signatureForColumn(node: Node): (String, ColumnSignature) =
+  private def signatureForElement(node: Node): Seq[(String, ColumnSignature)] =
     node match {
       case (
         Select(_, fieldSymbol: FieldSymbol)
       ) =>
-        fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol)
+        Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
       case OptionApply(
         Select(_, fieldSymbol: FieldSymbol)
       ) =>
-        fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol)
+        Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
       case _ => sys.error(s"$node is not a column node")
     }
 
-  private def signatureForColumns(columns: Seq[Node]): TableSignature = {
+  private def signatureForProduct(elements: Seq[Node]): TableSignature = {
     val columnSignatures: Map[String,ColumnSignature] =
-      columns.map(signatureForColumn).toMap
+      elements.flatMap(signatureForElement).toMap
 
     TableSignature(columnSignatures)
   }
@@ -172,7 +172,7 @@ object DBValidator {
   private def signatureForTableShape(node: Node): TableSignature =
     node match {
       // def * : ProvenShape[(Int,Int)] = (columnX, columnY)
-      case ProductNode(columns) => signatureForColumns(columns)
+      case ProductNode(elements) => signatureForProduct(elements)
 
       // def * : ProvenShape[Point] = (columnX, columnY) <> (Point.tupled, Point.unapply)
       case TypeMapping(shape, _, _) => signatureForTableShape(shape)
