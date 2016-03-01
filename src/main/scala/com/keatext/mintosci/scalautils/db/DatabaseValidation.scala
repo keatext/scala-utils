@@ -135,7 +135,7 @@ object DBValidator {
 
   // for debugging
   private def dumpAST(node: Node, indent: String = ""): Unit = {
-    println(indent + node.toString)
+    println(indent + node.toString + " : " + node.getClass.toString)
     node.nodeChildren.foreach {
       dumpAST(_, indent + "  ")
     }
