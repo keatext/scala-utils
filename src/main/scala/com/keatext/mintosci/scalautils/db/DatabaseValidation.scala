@@ -151,45 +151,31 @@ object DBValidator {
 
   private def signatureForElement(node: Node): Seq[(String, ColumnSignature)] =
     node match {
-      case (
-        Select(_, fieldSymbol: FieldSymbol)
-      ) =>
-        Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
-
-      case OptionApply(
-        Select(_, fieldSymbol: FieldSymbol)
-      ) =>
-        Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
-
+      // def * : ProvenShape[(Int,Int)] = (columnX, columnY)
       case ProductNode(elements) =>
         elements.flatMap(signatureForElement)
 
-      case _ => sys.error(s"$node is not a column node")
-    }
-
-  private def signatureForProduct(elements: Seq[Node]): TableSignature = {
-    val columnSignatures: Map[String,ColumnSignature] =
-      elements.flatMap(signatureForElement).toMap
-
-    TableSignature(columnSignatures)
-  }
-
-  private def signatureForTableShape(node: Node): TableSignature =
-    node match {
-      // def * : ProvenShape[(Int,Int)] = (columnX, columnY)
-      case ProductNode(elements) => signatureForProduct(elements)
-
       // def * : ProvenShape[Point] = (columnX, columnY) <> (Point.tupled, Point.unapply)
-      case TypeMapping(shape, _, _) => signatureForTableShape(shape)
+      case TypeMapping(lhs, _, _) =>
+        signatureForElement(lhs)
 
-      case _ => sys.error(s"$node is not a table shape node")
+      // def * : ProvenShape[Int] = columnX
+      case Select(_, fieldSymbol: FieldSymbol) =>
+        Seq(fieldSymbol.name -> signatureForFieldSymbol(fieldSymbol))
+
+      // def * : ProvenShape[Long] = id.?
+      case OptionApply(element) =>
+        signatureForElement(element)
+
+      case _ => sys.error(s"$node is not a column node")
     }
 
   // The node can be obtained via an expression of the form `TableQuery[Users].toNode`
   def signatureForTable(node: Node): TableSignature =
     node match {
-      case TableExpansion(_, _, shape) =>
-        signatureForTableShape(shape)
+      case TableExpansion(_, _, columns) =>
+        TableSignature(signatureForElement(columns).toMap)
+
       case _ => sys.error(s"$node is not a table node")
     }
 }
