@@ -1,5 +1,8 @@
 package com.keatext.mintosci.scalautils
 
+import slick.dbio.DBIOAction
+import slick.driver.PostgresDriver.api._
+
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
@@ -68,4 +71,33 @@ object TransactionalFuture {
         element <- futureElement
       } yield seq :+ element
     }
+
+
+  // "unsafe" because the types don't guarantee correct usage.
+  //
+  // example of incorrect usage:
+  //   {
+  //     val future = Future(...)
+  //     TransactionalFuture.unsafeFromFuture(future)
+  //   }
+  //
+  // example of correct usage:
+  //   TransactionalFuture.unsafeFromFuture(
+  //     Future(...)
+  //   )
+  //
+  // The former usage is incorrect because the Future starts executing
+  // as soon as it is defined, outside of the critical section.
+  def unsafeFromFuture[A](body: => Future[A])
+  : TransactionalFuture[A] =
+    new TransactionalFuture(
+      Await.result(body, Duration.Inf)
+    )
+
+  // a variant of db.run which runs in a critical section
+  def dbRun[R,E <: Effect](action: DBIOAction[R,NoStream,E])(
+    implicit db: Database
+  )
+  : TransactionalFuture[R] =
+    unsafeFromFuture(db.run(action))
 }
