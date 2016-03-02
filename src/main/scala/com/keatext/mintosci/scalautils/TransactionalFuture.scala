@@ -61,7 +61,9 @@ object TransactionalFuture {
         f(a)
     }
 
-  def sequence[A](futures: Iterable[TransactionalFuture[A]])
+  // Note that Future.sequence runs its arguments in parallel,
+  // while this runs the computations one after the other.
+  def sequentially[A](futures: Iterable[TransactionalFuture[A]])
   : TransactionalFuture[Seq[A]] =
     futures.foldLeft(
       TransactionalFuture.successful(Seq.empty[A])
