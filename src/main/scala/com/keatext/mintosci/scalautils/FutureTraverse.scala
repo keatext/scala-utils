@@ -1,5 +1,9 @@
 package com.keatext.mintosci.scalautils
 
+import scala.collection.GenTraversableLike
+import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.{Queue, Stack}
+import scala.collection.mutable.Builder
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -7,17 +11,27 @@ import scala.concurrent.{ExecutionContext, Future}
   * (note that Future.sequence is __not__ sequential so we need something better)
   */
 object FutureTraverse {
-  def traverse[A, B]
-    (objects: Iterable[A])(f: A => Future[B])
-    (implicit ec: ExecutionContext)
-  : Future[List[B]] = {
-    objects match {
-      case (head :: tail) =>
-        for {
-          res <- f(head)
-          restail <- traverse(tail)(f)
-        } yield res :: restail
-      case Nil => Future.successful(List())
+  def traverse[A, B, Repr, That](
+    objects: GenTraversableLike[A,Repr]
+  )(
+    f: A => Future[B]
+  )(
+    implicit cbf: CanBuildFrom[Repr, B, That],
+    ec: ExecutionContext
+  )
+  : Future[That] = {
+    objects.foldLeft[Future[Queue[B]]](
+      Future.successful(Queue())
+    ) { (futureElems, a) =>
+      for {
+        elems <- futureElems
+        elem <- f(a)
+      } yield elems :+ elem
+    }.map { queue =>
+      val builder: Builder[B,That] = cbf()
+      builder ++= queue
+      builder.result()
     }
   }
 }
+
