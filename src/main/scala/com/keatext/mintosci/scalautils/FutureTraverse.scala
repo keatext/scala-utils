@@ -2,6 +2,7 @@ package com.keatext.mintosci.scalautils
 
 import scala.collection.GenTraversableLike
 import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.{Queue, Stack}
 import scala.collection.mutable.Builder
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,16 +20,16 @@ object FutureTraverse {
     ec: ExecutionContext
   )
   : Future[That] = {
-    objects.foldLeft[Future[Seq[B]]](
-      Future.successful(Seq())
+    objects.foldLeft[Future[Queue[B]]](
+      Future.successful(Queue())
     ) { (futureElems, a) =>
       for {
         elems <- futureElems
         elem <- f(a)
       } yield elems :+ elem
-    }.map { seq =>
+    }.map { queue =>
       val builder: Builder[B,That] = cbf()
-      builder ++= seq
+      builder ++= queue
       builder.result()
     }
   }
