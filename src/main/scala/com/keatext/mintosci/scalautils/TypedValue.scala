@@ -19,6 +19,15 @@ import scala.reflect.ClassTag
 //
 trait TypedValue[T] {
   val value: T
+
+  // There are two cases in which string interpolation syntax is likely to be used with TypedValues:
+  //   - s"${itemId} not found"
+  //   - s"/items/${itemId}/create"
+  // While for the first case we prefer "ItemId(1234) not found" to "1234 not found", so we can see at a glance
+  // what kind of thing was not found, the second case is more important, and we prefer "/items/1234/create", so
+  // we override toString() to get that behavior.
+  override def toString: String =
+    value.toString
 }
 
 object TypedValue {
