@@ -28,6 +28,10 @@ trait TypedValue[T] {
   // we override toString() to get that behavior.
   override def toString: String =
     value.toString
+
+  // For those cases when we do prefer "ItemId(1234)".
+  def show: String =
+    s"${this.getClass.getSimpleName}(${value.toString})"
 }
 
 object TypedValue {
