@@ -54,7 +54,11 @@ class QueryOption[+E,U](val query: Query[E,U,Seq]) {
   ): DBIOAction[Unit,NoStream,Write] =
     query
     .update(newValue)
-    .map { nbModifiedRows => assert(nbModifiedRows == 1) }
+    .map { nbModifiedRows =>
+      if(nbModifiedRows != 1) throw new NoSuchElementException(
+        s"updated failed: the database query (${query.update(newValue).statements.head}) found no rows to update"
+      )
+    }
 
   def delete1()(
     implicit toDeleteActionExtensionMethods: Query[E,U,Seq] => PostgresDriver.DeleteActionExtensionMethods,
@@ -62,7 +66,11 @@ class QueryOption[+E,U](val query: Query[E,U,Seq]) {
   ): DBIOAction[Unit,NoStream,Write] =
     query
       .delete
-      .map { nbDeletedRows => assert(nbDeletedRows == 1) }
+      .map { nbDeletedRows =>
+        if (nbDeletedRows != 1) throw new NoSuchElementException(
+          s"delete failed: the database query (${query.delete.statements.head}) found no rows to delete"
+        )
+      }
 
 
   // help type inference figure out how to call common Query methods
