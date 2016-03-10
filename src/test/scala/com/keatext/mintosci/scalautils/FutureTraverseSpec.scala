@@ -75,32 +75,3 @@ class FrontendApiSpecs extends FlatSpec with Matchers with ScalaFutures {
     }
   }
 }
-
-
-/*
-
-import com.keatext.mintosci.scalautils.FutureTraverse
-import scala.concurrent.{ExecutionContext, Future}
-
-
-
-val r5 = FutureTraverse.traverse(List(1,2,3)) { x =>
-  Future {
-    println(s"begin ${x}")
-    Thread.sleep(1000)
-    println(s"end ${x}")
-    x * x
-  }
-}
-
-Thread.sleep(1000)
-
-r1.value
-r2.value
-r3.value
-r4.value
-r5.value
-
-
-
-*/
