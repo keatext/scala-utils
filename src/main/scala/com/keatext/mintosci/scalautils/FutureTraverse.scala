@@ -27,5 +27,29 @@ object FutureTraverse {
     }.map { builder =>
       builder.result()
     }
+
+  def filter[A, Repr, That](
+    objects: GenTraversableLike[A,Repr]
+  )(
+    f: A => Future[Boolean]
+  )(
+    implicit cbf: CanBuildFrom[Repr, A, That],
+    ec: ExecutionContext
+  )
+  : Future[That] =
+    objects.foldLeft[Future[Builder[A,That]]](
+      Future.successful(cbf())
+    ) { (futureBuilder, a) =>
+      for {
+        builder <- futureBuilder
+        keep <- f(a)
+      } yield if (keep) {
+        builder += a
+      } else {
+        builder
+      }
+    }.map { builder =>
+      builder.result()
+    }
 }
 
