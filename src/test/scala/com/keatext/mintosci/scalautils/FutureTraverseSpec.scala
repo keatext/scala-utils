@@ -57,7 +57,7 @@ class FrontendApiSpecs extends FlatSpec with Matchers with ScalaFutures {
     }
   }
 
-  it should "execute the futures sequentially" in {
+  it should "traverse the futures sequentially" in {
     val queue = Queue[Int]()
     val future = FutureTraverse.traverse(List(3,1,2)) { x =>
       Future {
@@ -74,33 +74,45 @@ class FrontendApiSpecs extends FlatSpec with Matchers with ScalaFutures {
       case _ => assert(false)
     }
   }
-}
 
 
-/*
+  it should "keep the odd elements" in {
+    val future = FutureTraverse.filter(Set(1,2,3)) { x =>
+      Future(x % 2 == 1)
+    }
 
-import com.keatext.mintosci.scalautils.FutureTraverse
-import scala.concurrent.{ExecutionContext, Future}
+    whenReady(future) {
+      case (r : Set[Int]) => assert(r == Set(1,3))
+      case _ => assert(false)
+    }
+  }
 
+  it should "keep the odd elements, preserving the order" in {
+    val future = FutureTraverse.filter(List(1,2,3)) { x =>
+      Future(x % 2 == 1)
+    }
 
+    whenReady(future) {
+      case (r : List[Int]) => assert(r == List(1,3))
+      case _ => assert(false)
+    }
+  }
 
-val r5 = FutureTraverse.traverse(List(1,2,3)) { x =>
-  Future {
-    println(s"begin ${x}")
-    Thread.sleep(1000)
-    println(s"end ${x}")
-    x * x
+  it should "filter the futures sequentially" in {
+    val queue = Queue[Int]()
+    val future = FutureTraverse.filter(List(3,1,2)) { x =>
+      Future {
+        Thread.sleep(x * 100)
+        queue += x
+        x % 2 == 1
+      }
+    }
+
+    whenReady(future, Timeout(1 second)) {
+      case (r : List[Int]) =>
+        assert(r == List(3,1))
+        assert(queue == Queue(3,1,2))
+      case _ => assert(false)
+    }
   }
 }
-
-Thread.sleep(1000)
-
-r1.value
-r2.value
-r3.value
-r4.value
-r5.value
-
-
-
-*/
