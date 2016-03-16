@@ -4,7 +4,9 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding
 import akka.http.scaladsl.marshalling.Marshaller
+import akka.http.scaladsl.model.StatusCodes.ClientError
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import akka.stream.Materializer
 
@@ -26,6 +28,21 @@ trait HttpRequests {
     Http().singleRequest(addExtraHeaders(httpRequest)).flatMap {
       case HttpResponse(statusCode, _, responseEntity, _) if statusCode.isSuccess() =>
         Unmarshal(responseEntity).to[A]
+      case HttpResponse(ClientError(429), headers, _, _) =>
+        headers.collectFirst {
+          case HttpHeader("retry-after", seconds) => seconds.toInt
+        } match {
+          case Some(secondsToWait) =>
+            for {
+              () <- Future {
+                Thread.sleep(1000 * secondsToWait)
+              }
+
+              // try again
+              r <- requestAs[A](httpRequest)
+            } yield r
+          case None => throw new Exception("429 status with no Retry-After header")
+        }
       case HttpResponse(statusCode, _, responseEntity, _) =>
         Unmarshal(responseEntity).to[String].map(content =>
           throw new Exception(
