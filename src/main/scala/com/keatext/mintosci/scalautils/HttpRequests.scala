@@ -15,8 +15,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait HttpRequests {
   // extend HttpRequests and override this if you need to include extra headers with every request
-  def addExtraHeaders(httpRequest: HttpRequest): HttpRequest =
-    httpRequest
+  def addExtraHeaders(httpRequest: HttpRequest)
+  : Future[HttpRequest] =
+    Future.successful(httpRequest)
 
   // the Future fails if the request fails
   def requestAs[A](httpRequest: HttpRequest)(
@@ -25,30 +26,34 @@ trait HttpRequests {
     materializer: Materializer,
     executionContext: ExecutionContext
   ): Future[A] =
-    Http().singleRequest(addExtraHeaders(httpRequest)).flatMap {
-      case HttpResponse(statusCode, _, responseEntity, _) if statusCode.isSuccess() =>
-        Unmarshal(responseEntity).to[A]
-      case HttpResponse(ClientError(429), headers, _, _) =>
-        headers.collectFirst {
-          case HttpHeader("retry-after", seconds) => seconds.toInt
-        } match {
-          case Some(secondsToWait) =>
-            for {
-              () <- Future {
-                Thread.sleep(1000 * secondsToWait)
-              }
+    addExtraHeaders(httpRequest)
+      .flatMap { extendedRequest =>
+        Http().singleRequest(extendedRequest)
+      }
+      .flatMap {
+        case HttpResponse(statusCode, _, responseEntity, _) if statusCode.isSuccess() =>
+          Unmarshal(responseEntity).to[A]
+        case HttpResponse(ClientError(429), headers, _, _) =>
+          headers.collectFirst {
+            case HttpHeader("retry-after", seconds) => seconds.toInt
+          } match {
+            case Some(secondsToWait) =>
+              for {
+                () <- Future {
+                  Thread.sleep(1000 * secondsToWait)
+                }
 
-              // try again
-              r <- requestAs[A](httpRequest)
-            } yield r
-          case None => throw new Exception("429 status with no Retry-After header")
-        }
-      case HttpResponse(statusCode, _, responseEntity, _) =>
-        Unmarshal(responseEntity).to[String].map(content =>
-          throw new Exception(
-            s"${statusCode.value} returned by ${httpRequest.method.name} ${httpRequest.getUri()} ${content}")
-        )
-    }
+                // try again
+                r <- requestAs[A](httpRequest)
+              } yield r
+            case None => throw new Exception("429 status with no Retry-After header")
+          }
+        case HttpResponse(statusCode, _, responseEntity, _) =>
+          Unmarshal(responseEntity).to[String].map(content =>
+            throw new Exception(
+              s"${statusCode.value} returned by ${httpRequest.method.name} ${httpRequest.getUri()} ${content}")
+          )
+      }
 
   def getAs[A](url: String)(
     implicit unmarshaller: Unmarshaller[ResponseEntity,A],
