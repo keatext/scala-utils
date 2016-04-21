@@ -33,10 +33,30 @@ object DBValidator {
   private def validate(dBSignature: DBSignature, expectedDBSignature: DBSignature): DBValidity =
     if (dBSignature.tables.isEmpty)
       EmptyDB()
-    else if (dBSignature == expectedDBSignature)
+    else if (isCompatibleWith(dBSignature, expectedDBSignature))
       ValidDB()
     else
       DBRequiresMigration()
+
+
+  private def isCompatibleWith(actual: DBSignature, expected: DBSignature): Boolean =
+    expected.tables.forall {
+      case (tableName, expectedTableSignature) =>
+        isCompatibleWith(actual.tables.get(tableName), Some(expectedTableSignature))
+    }
+
+  private def isCompatibleWith(optionActual: Option[TableSignature], optionExpected: Option[TableSignature]): Boolean =
+    (optionActual, optionExpected) match {
+      case (None, None) => true
+      case (Some(actual), Some(expected)) => isCompatibleWith(actual, expected)
+      case _ => false
+    }
+
+  private def isCompatibleWith(actual: TableSignature, expected: TableSignature): Boolean =
+    expected.columns.forall {
+      case (columnName, expectedColumnSignature) =>
+        actual.columns.get(columnName).contains(expectedColumnSignature)
+    }
 
 
   private def sqlType(column: FieldSymbol): String = {
