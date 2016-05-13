@@ -63,6 +63,14 @@ trait HttpRequests {
   ): Future[A] =
     requestAs[A](RequestBuilding.Get(url))
 
+  def postAs[R](url: String)(
+    implicit unmarshaller: Unmarshaller[ResponseEntity, R],
+    actorSystem: ActorSystem,
+    materializer: Materializer,
+    executionContext: ExecutionContext
+  ): Future[R] =
+    requestAs[R](RequestBuilding.Post(url))
+
   def postAs[S, R](url: String, payload: S)(
     implicit unmarshaller: Unmarshaller[ResponseEntity, R],
     marshaller: Marshaller[S, RequestEntity],
