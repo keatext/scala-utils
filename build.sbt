@@ -4,7 +4,7 @@ organization := "com.keatext"
 
 version := version.value
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 scalacOptions := Seq(
   "-unchecked", "-deprecation", "-encoding", "utf8", "-feature", "-Xlint", "-Xfatal-warnings"
@@ -12,8 +12,7 @@ scalacOptions := Seq(
 
 libraryDependencies ++= {
   val version = Map(
-    "akka"         -> "2.3.12",
-    "akka-stream"  -> "2.0.3",
+    "akka"         -> "2.4.6",
     "postgresql"   -> "9.4-1201-jdbc41",
     "scala-test"   -> "2.2.1",
     "slf4j"        -> "1.6.4",
@@ -22,11 +21,9 @@ libraryDependencies ++= {
   )
 
   Seq(
-    "com.typesafe.akka"    %% "akka-actor"                        % version("akka"),
-    "com.typesafe.akka"    %% "akka-http-core-experimental"       % version("akka-stream"),
-    "com.typesafe.akka"    %% "akka-http-experimental"            % version("akka-stream"),
-    "com.typesafe.akka"    %% "akka-http-spray-json-experimental" % version("akka-stream"),
-    "com.typesafe.akka"    %% "akka-stream-experimental"          % version("akka-stream"),
+    "com.typesafe.akka"    %% "akka-http-core"                    % version("akka"),
+    "com.typesafe.akka"    %% "akka-http-experimental"            % version("akka"),
+    "com.typesafe.akka"    %% "akka-http-spray-json-experimental" % version("akka"),
     "com.typesafe.slick"   %% "slick"                             % version("slick"),
     "io.spray"             %% "spray-json"                        % version("spray"),
     "org.postgresql"        % "postgresql"                        % version("postgresql"),
