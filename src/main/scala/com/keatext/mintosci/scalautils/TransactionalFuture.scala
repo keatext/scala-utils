@@ -16,7 +16,7 @@ class TransactionalFuture[A](body: => A) {
 
   def run(implicit ec: ExecutionContext)
   : Future[A] =
-    Future {
+    FutureTraverse.fromBlocking {
       TransactionalFuture.mutex.synchronized {
         body
       }
