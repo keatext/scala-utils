@@ -22,7 +22,7 @@ object FutureTry {
   def apply[A](future: Future[A])(
     implicit executionContext: ExecutionContext
   ): FutureTry[A] = new FutureTry(
-    Future(
+    FutureTraverse.fromBlocking(
       Try {
         Await.result(future, Duration.Inf)
       }

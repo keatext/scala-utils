@@ -39,7 +39,7 @@ trait HttpRequests {
           } match {
             case Some(secondsToWait) =>
               for {
-                () <- Future {
+                () <- FutureTraverse.fromBlocking {
                   Thread.sleep(1000 * secondsToWait)
                 }
 
