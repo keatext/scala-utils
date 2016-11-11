@@ -32,7 +32,7 @@ trait HttpRequests {
       }
       .flatMap {
         case HttpResponse(statusCode, _, responseEntity, _) if statusCode.isSuccess() =>
-          Unmarshal(responseEntity).to[A]
+          Unmarshal(responseEntity.withoutSizeLimit()).to[A]
         case HttpResponse(ClientError(429), headers, _, _) =>
           headers.collectFirst {
             case HttpHeader("retry-after", seconds) => seconds.toInt
@@ -49,7 +49,7 @@ trait HttpRequests {
             case None => throw new Exception("429 status with no Retry-After header")
           }
         case HttpResponse(statusCode, _, responseEntity, _) =>
-          Unmarshal(responseEntity).to[String].map(content =>
+          Unmarshal(responseEntity.withoutSizeLimit()).to[String].map(content =>
             throw new Exception(
               s"${statusCode.value} returned by ${httpRequest.method.name} ${httpRequest.getUri()} ${content}")
           )
