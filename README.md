@@ -13,25 +13,25 @@ This makes it more difficult to migrate to a more recent version of either of th
 
 I must also admit that adding code to `scala-utils` is more annoying than adding it directly to a module of the current microservice, and as a result, we currently have a lot of reusable code which lives in individual microservices. I think it's okay for it to stay there for now, until we happen to need it in a different module: performing the refactoring is annoying, but not nearly as annoying as maintaining two separate copies of the same code.
 
-If you do want to add your reusable code directly to `scala-utils`, run `sbt '~ publish-local'` so that sbt continuously publishes your latest modifications to `scala-utils` to your local Ivy repository, and in your microservice, set your `scala-utils` version to the `X.Y.Z-SNAPSHOT` version listed in `version.sbt`. Then, once you are ready to commit, push your changes to `scala-utils` first so that Bamboo publishes a non-snapshot version `X.Y.Z`, and change your microservice to use that version of `scala-utils`. You must not commit a `build.sbt` which uses a `-SNAPSHOT` version, because on other machines, `sbt compile` will complain that it cannot find this version.
+If you do want to add your reusable code directly to `scala-utils`, run `sbt '~ publish-local'` so that sbt continuously publishes your latest `scala-utils` modifications to your local Ivy repository, and in your microservice, set your `scala-utils` version to the `X.Y.Z-SNAPSHOT` version listed in `version.sbt`. Then, once you are ready to commit, push your changes to `scala-utils` first so that Bamboo publishes a non-snapshot version `X.Y.Z`, and change your microservice to use that version of `scala-utils`. You must not commit a `build.sbt` which uses a `-SNAPSHOT` version, because on other machines, `sbt compile` will complain that it cannot find this version.
 
 
 Reusable pieces
 ---
 
-`DatabaseManager` makes it easy to conditionally initialize a postgres database using Slick. Instantiate a concrete `MyDatabaseManager` singleton for your project, instantiating `tables` to the concrete list of all the Slick classes which represent your tables, and call `createTablesIfNeeded` at the start of your program: the tables will be created unless they already exist.
+`DatabaseManager` makes it easy to conditionally initialize a postgres database using Slick. Simply define a concrete `MyDatabaseManager` singleton for your project, instantiating `tables` to the concrete list of all the Slick classes which represent your tables, and call `createTablesIfNeeded` at the start of your program: the tables will be created unless they already exist.
 
 This doesn't just check that tables with the correct name exist, it also makes sure that those existing tables have the expected schema. This way, if you update the schema of your tables and later run a version of your microservice which expects the older version, you'll get an exception on startup instead of later on when the table is needed. This is even more useful when you did upgrade the schema of your local and staging databases and you do run the latest version of the code which expected this new schema, but you forgot to upgrade the schema in prod.
 
-One bit of related code which should probably be made more reusable and moved here is the migration logic in `mintosci-subscriptions`. Instead of expecting the table schema to be updated at deployment time, that version creates a separate table and migrates all the existing data to it; this way, the older version of the code can continue to use the older version of the table. I'm not sure what to do about the events which come in after that migration is performed but before the event source is switched from the older version of the code to the newer version of the code: the older version of the table will be modified accordingly, but then those changes will be lost after the switch. This kind of corner cases is one of the reasons I have been pushing for a datomic-style database in which we can work on a snapshot from a particular time and then replay all the events starting from that time.
+One bit of related code which should probably be made more reusable and moved here is the migration logic in `mintosci-subscriptions`. Instead of expecting the person who performs the deployment to manually migrate the table at deployment time, that version creates a separate table and migrates all the existing data to it; this way, the older version of the code can continue to use the older version of the table, so we can perform the migration in advance. I'm not sure what to do about the events which come in after that migration is performed but before the event source is switched from the older version of the code to the newer version of the code: the older version of the table will be modified accordingly, but then those changes will be lost after the switch. This kind of problem is one of the reasons I have been pushing for a datomic-style database in which we can work on a snapshot from a particular time and then replay all the events starting from that time.
 
 ----
 
-`FutureTraverse` was originally added for the sole purpose of adding the method [`Future.traverse`](http://www.scala-lang.org/api/current/scala/concurrent/Future$.html#traverse[A,B,M[X]<:TraversableOnce[X]](in:M[A])(fn:A=>scala.concurrent.Future[B])(implicitcbf:scala.collection.generic.CanBuildFrom[M[A],B,M[B]],implicitexecutor:scala.concurrent.ExecutionContext):scala.concurrent.Future[M[B]]), which didn't exist at the time. Instead, there was `Future.sequence`, which executes a bunch of Futures in parallel.
+`FutureTraverse` was originally created for the sole purpose of adding the method [`Future.traverse`](http://www.scala-lang.org/api/current/scala/concurrent/Future$.html#traverse[A,B,M[X]<:TraversableOnce[X]](in:M[A])(fn:A=>scala.concurrent.Future[B])(implicitcbf:scala.collection.generic.CanBuildFrom[M[A],B,M[B]],implicitexecutor:scala.concurrent.ExecutionContext):scala.concurrent.Future[M[B]]), which didn't exist at the time. Instead, there was `Future.sequence`, which executes a bunch of Futures in parallel.
 
-It is easy to `map` a function `A => Future[A]` onto a `List[A]` to obtain a `List[Future[A]]`, and then to `sequence` that list into a `Future[List[A]]`. But then all of those functions will execute in parallel, and that exhausted all of the database handles we had and led to a failure. We were looking for a version of `Future.sequence` which would execute its futures, well, sequentially.
+It is easy to `map` a function `A => Future[B]` onto a `List[B]` to obtain a `List[Future[B]]`, and then to `sequence` that list into a `Future[List[B]]`. But then all of those functions will execute in parallel, and that exhausted all of the database handles we had and led to a failure. We were looking for a version of `Future.sequence` which would execute its futures, well, sequentially.
 
-Unfortunately such a version cannot exist, because once it receives its `List[Future[A]]`, all of those futures are already running and it is too late to stop them. So instead, we want to delay the creation of the futures, using something like a `List[() => Future[A]]`. Taking inspiration from Haskell's `traverse`, I chose the following nicer API instead:
+Unfortunately such a version cannot exist, because once it receives its `List[Future[B]]`, all of those futures are already running and it is too late to stop them. So instead, we want to delay the creation of the futures, using something like a `List[() => Future[B]]`. Taking inspiration from Haskell's `traverse`, I chose the following nicer API instead:
 
 ```scala
 def traverse(inputs: List[A])(f: A => Future[B]): Future[List[B]]
@@ -55,11 +55,11 @@ There is no link between `FutureTraverse.fromBlocking` and `FutureTraverse.trave
 
 ----
 
-`FutureTry.sequence` is a version of `Future.sequence` which runs N long-running and possibly-failing computations in parallel and returns the failures and successes via N values of type `Try[A]`.
+`FutureTry.sequence` is a version of `Future.sequence` which runs N long-running and possibly-failing computations in parallel and returns the failures and successes as N values of type `Try[A]`. Since normal `Future[A]` computations can fail, the normal `Future.sequence` also runs N long-running and possibly-failing computations in parallel, but it returns a `Future[List[A]]`, so if any of the computations fail, the entire sequence is deemed to have failed.
 
-The normal `Future.sequence` also runs N long-running and possibly-failing computations in parallel, but if any of the computations fail, the entire sequence is deemed to have failed. Note that despite the name, acheiving the result of `FutureTry.sequence` is not as easy as running each of those computations inside a `Try` block. If you put the `Try` block outside of the `Future` block, the creation of the `Future` block will succeed even the computation it describes fails at runtime, and if you put the `Try` block inside of the `Future` block, you won't be able to run any `Future` computation inside of it.
+Note that despite the name, acheiving the result of `FutureTry.sequence` is not as easy as running each of those computations inside a `Try` block. If you put the `Try` block outside of the `Future` block, the creation of the `Future` block will succeed even if the computation it describes fails at runtime. And if you put the `Try` block inside of the `Future` block, you won't be able to run any `Future` computation inside of it.
 
-Note that there is no benefit to adding `map` and `flatMap` to `FutureTry` in order to benefit from a `for..yield` syntax for it. If we did, we would have to convert many of the `Future` sub-computations into `FutureTry` sub-computations, like this:
+Also note that there is no benefit to adding `map` and `flatMap` to `FutureTry` in order to benefit from a `for..yield` syntax for it. If we did, we would have to convert many of the `Future` sub-computations into `FutureTry` sub-computations, like this:
 
 ```scala
 val computeX: Future[Int]
@@ -71,7 +71,7 @@ val futureTry: FutureTry[Int] =
   } yield x + y
 ```
 
-Whereas without a `for..yield` notation for `FutureTry`, the user is naturally pushed towards a shorter syntax in which a single `FutureTry` wrapper is used:
+Whereas without a `for..yield` notation for `FutureTry`, the user is naturally pushed towards a shorter syntax in which a single `FutureTry` wrapper is sufficient:
 
 ```scala
 val futureTry: FutureTry[Int] =
@@ -83,25 +83,27 @@ val futureTry: FutureTry[Int] =
   }
 ```
 
-This works because `Future` already keeps track of the exceptions raised within its computation, we simply expose it with a more convenient interface based on `Try`.
+This works because `Future` already keeps track of the exceptions raised within its computation, we simply expose them with a more convenient interface based on `Try`.
 
 ----
 
-`HttpRequests` is a wrapper around akka-http's `Http().singleRequest` method for sending HTTP requests. I wrote this wrapper because I wrote two microservices which constantly need to make authenticated HTTP requests in order to talk to external services like Stripe or Zendesk. So I wrote `StripeRequests` and `ZendeskRequests` to automatically add the authentication boilerplate to every call, and I refactored the common part into `HttpRequests`. It also automatically waits and retries if we use the API too much and receive a 429 error, this was required for Zendesk and might be useful for other external services as well, assuming the error code and headers used are standard.
+`HttpRequests` is a wrapper around akka-http's `Http().singleRequest` method for sending HTTP requests. I wrote this wrapper because I wrote two microservices which constantly need to make authenticated HTTP requests in order to talk to external services like Stripe or Zendesk. So I wrote `StripeRequests` and `ZendeskRequests` to automatically add the authentication boilerplate to every call, and I refactored the common part into `HttpRequests`. It also automatically waits and retries if we use an API too much and receive a 429 error. This was modelled after Zendesk's 429 responses, and might be useful for other external services as well, assuming the error code and headers used are standard.
 
 ----
 
-`JsonColumn` is a helper for writing Slick table descriptions. It's much easier to write JSON converters using spray-json than to write table descriptions using Slick, so for those sets of columns which are never used to perform lookups, it's easier to just convert the data to JSON and to store it in a string column. Note that postgres supports a JSON column type, but then the column type is literally JSON, which means it can hold anything. Here, Slick makes sure that we only put in values of type `A`, and the fact that it gets serialized to JSON is a technical detail.
+`JsonColumn` is a helper for writing Slick table descriptions. It's much easier to write JSON converters using spray-json than to write table descriptions using Slick, so for those sets of columns which are never used to perform lookups, it's easier to just convert the data to JSON and to store it in an opaque string column.
 
-This isn't used by any of our microservices anymore, but it seems likely that we might want to use it in the future, and having this short class lying around isn't much of a maintenance burden, so I'd keep it there just in case.
+I know that postgres supports a JSON column type, but the goal here is not to store an arbitrary JSON value, I don't want postgres to waste its time trying to parse that value. Rather, I want to store a value of a particular type `A`, and the fact that the serialization format I use to store it into the database happens to be JSON is a mere implementation detail.
+
+This isn't used by any of our microservices anymore, but it seems likely that we might want to use it in the future. Since having this short class lying around isn't much of a maintenance burden, I'd keep it here just in case.
 
 ----
 
-`QueryOption` extends Slick with three new methods: `take1`, `update1` and `delete1`. The idea is that we usually use a WHERE clause which identifies a single row to be fetched, updated or edited, but Slick's API will consider the operation a success if zero, two, or more rows are affected.
+`QueryOption` extends Slick with three new methods: `take1`, `update1` and `delete1`. The idea is that we often use a WHERE clause to identify a single row to be fetched, updated or edited, but Slick's API will consider the operation a success if zero, two, or more rows are found.
 
-For UPDATEs and DELETEs, we're not doing anything with the result, so this will be a silent failure. This version checks that exactly one row was affected and throws an exception otherwise. This will help us identify situations in which our code is incorrect or in which our database is inconsistent.
+For UPDATEs and DELETEs, we're not doing anything with the result, so this would be a silent failure. With `update1` and `delete1`, we check that exactly one row was affected and we throw an exception otherwise. This will help us identify situations in which our code is incorrect or in which our database is inconsistent.
 
-For SELECTs, it is possible to express the fact that we only expect a single row using LIMIT 1, but Slick's API still returns a list and it feels a bit unsafe to do a `get(0)` on that list to fetch the only result. And indeed, it is unsafe: LIMIT 1 guarantees that there is at most one result, but it doesn't guarantee that there is at least one. So the proper way to represent the result is not a list, but an `Option`. The `take1` method does a `take(1)` and wraps the result in an `Option` instead of a list, encouraging the caller to add some error-checking code to throw a more readable exception if zero rows were returned.
+For SELECTs, it is possible to express the fact that we only expect a single row using LIMIT 1, but Slick's API still returns a list and it feels a bit unsafe to do a `get(0)` on that list to fetch the only result. And indeed, it is unsafe: LIMIT 1 guarantees that there is at most one result, but it doesn't guarantee that there is at least one. So the proper way to represent the result is not a list, but an `Option`. The `take1` method does a LIMIT 1 and wraps the result in an `Option` instead of a list, encouraging the caller to add some error-checking code to throw a more readable exception if zero rows are returned.
 
 ----
 
@@ -132,7 +134,7 @@ Note that the type really is `Environment.Value`, not `Environment`. It would ma
 
 ----
 
-`TransactionalFuture` is a version of `Future` which does _not_ run in parallel with other `TransactionalFuture` computations, on the contrary, a mutex is used to make sure that at most one such computation runs at a time. The idea is to provide critical sections using a very familiar interface: it's a regular Future, so like all Futures it can take some time to complete, in this case because it could be waiting to obtain the lock. This version is very simple, there is only one global lock so there are no race conditions, but I assume it could be extended to support multiple locks if we end up using this a lot.
+`TransactionalFuture` is a version of `Future` which does _not_ run in parallel with other `TransactionalFuture` computations, on the contrary, a mutex is used to make sure that at most one such computation runs at a time. The idea is to provide critical sections using a very familiar interface: it's a regular Future, so like all Futures it can take some time to complete, in this case because it could be waiting to obtain the lock. This version is very simple, there is only one global lock so there are no race conditions, but I don't think it would be too hard to extend this implementation to support more locks if needed.
 
 The only place in which this is used is in `mintosci-zendesk`, to obtain transactional semantics despite the fact that Slick's transactional guarantees are very weak.
 
