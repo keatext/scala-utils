@@ -45,11 +45,11 @@ releaseVersionBump := sbtrelease.Version.Bump.Bugfix
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 publishTo in Global := {
-  val nexus = "http://data/"
+  val nexus = "https://nexus.keatext.ai/repository/"
   if (isSnapshot.value)
-    Some("snapshots" at nexus + "nexus/content/repositories/snapshots")
+    Some("snapshots" at nexus + "snapshots")
   else
-    Some("releases"  at nexus + "nexus/content/repositories/releases")
+    Some("releases"  at nexus + "releases")
 }
 
 releaseProcess := Seq[ReleaseStep](
