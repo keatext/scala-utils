@@ -55,7 +55,14 @@ object DBValidator {
   private def isCompatibleWith(actual: TableSignature, expected: TableSignature): Boolean =
     expected.columns.forall {
       case (columnName, expectedColumnSignature) =>
-        actual.columns.get(columnName).contains(expectedColumnSignature)
+        val isContained = actual.columns.get(columnName).contains(expectedColumnSignature)
+        if (!isContained) {
+          println(s"$columnName is not matching signature of ")
+          println(expectedColumnSignature)
+          println("as it was ")
+          println(actual.columns.get(columnName))
+        }
+        isContained
     }
 
 
@@ -81,6 +88,7 @@ object DBValidator {
       case "INT4" => "INTEGER"
       case "INT8" => "BIGINT"
       case "SERIAL" => "INTEGER"
+      case "BIGSERIAL" => "BIGINT"
       case other => other
     }
 
